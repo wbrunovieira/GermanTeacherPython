@@ -1,110 +1,108 @@
-import os
+# main.py
 import json
+import os
 from datetime import datetime
-from dotenv import load_dotenv
 import openai
-from elevenlabs import generate, save
+from config import carregar_configuracoes
 
-# Carregar variáveis de ambiente
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+def ler_tempos_json(caminho='temas.json'):
+    """
+    Lê o arquivo JSON contendo os temas.
+    """
+    with open(caminho, 'r', encoding='utf-8') as file:
+        temas = json.load(file)
+    return temas
 
-# Definir os dados dos estudantes
-estudantes = {
-    "Gabriel": "+34674804376",
-    "Bruno": "+5511982864581"
-}
+def salvar_tempos_json(temas, caminho='temas.json'):
+    """
+    Salva a lista de temas atualizada no arquivo JSON.
+    """
+    with open(caminho, 'w', encoding='utf-8') as file:
+        json.dump(temas, file, ensure_ascii=False, indent=4)
 
-temas = [
-    "saudações e despedidas",
-    "dias da semana e meses do ano",
-    "cores e formas",
-    "números e contagem",
-    "palavras de família e parentesco",
-    "ações do dia a dia (verbos básicos)",
-    "comida e bebida",
-    "lugares na cidade",
-    "adjetivos comuns",
-    "clima e tempo",
-]
-
-
-def obter_tema_do_dia():
-    dia = datetime.now().day
-    return temas[dia % len(temas)]  
-
+def buscar_e_atualizar_primeiro_tema(temas):
+    """
+    Busca o primeiro tema que ainda não foi executado, atualiza seu status e data.
+    Retorna o tema encontrado (ou None, se todos já tiverem sido executados).
+    """
+    for item in temas:
+        if not item.get("executado", False):
+            item["executado"] = True
+            item["data"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return item["tema"]
+    return None
 
 def gerar_texto_aula(tema):
-    prompt = f"o seu nome e Greta Crie uma lição simples de alemão para iniciantes, focando no tema '{tema}'. Inclua exemplos práticos e palavras básicas."
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=prompt,
-        max_tokens=200
-    )
-    return response.choices[0].text.strip()
+    """
+    Função para gerar texto de aula utilizando o modelo da OpenAI.
+    Inclui restrições de tamanho e tom amigável para facilitar a geração de áudio.
+    """
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Você é uma professora de alemão chamada Greta."},
+                {"role": "user", "content": (
+                    f"Crie uma lição simples de alemão para iniciantes, focando no tema '{tema}'. "
+                    "Inclua exemplos práticos e palavras básicas. "
+                    "Escreva o texto de forma amigável, com no mínimo 500 caracteres e no máximo 1000 caracteres, "
+                    "para facilitar a geração de áudio."
+                )}
+            ]
+        )
+        message_text = response.choices[0].message.content
+        return message_text
+    except Exception as e:
+        print(f"Erro ao se comunicar com a OpenAI: {e}")
+        return None
 
+def salvar_texto_em_diretorio(texto, tema, diretorio="teacher_texts"):
+    """
+    Salva o texto gerado em um arquivo dentro do diretório especificado.
+    O nome do arquivo é baseado no tema, com espaços substituídos por underscores.
+    """
 
-
-
-def gerar_audio(texto, output_path):
-    audio = generate(
-        text=texto,
-        voice="Arnold",  
-        model="eleven_monolingual_v1"
-    )
-    save(audio, output_path)
-
-
-def salvar_transcricao(estudante, texto):
-
-    diretorio = "aulas"
     if not os.path.exists(diretorio):
         os.makedirs(diretorio)
+    
 
-
-    data_atual = datetime.now().strftime("%Y-%m-%d")
-    arquivo_json = os.path.join(diretorio, f"{data_atual}.json")
-
-
-    historico = {}
-    if os.path.exists(arquivo_json):
-        with open(arquivo_json, "r") as arquivo:
-            historico = json.load(arquivo)
-
-
-    if estudante not in historico:
-        historico[estudante] = []
-    historico[estudante].append({
-        "data": datetime.now().isoformat(),
-        "conteudo": texto
-    })
-
-
-    with open(arquivo_json, "w") as arquivo:
-        json.dump(historico, arquivo, indent=4, ensure_ascii=False)
-
-    print(f"Transcrição salva no arquivo {arquivo_json}.")
-
+    nome_arquivo = f"{tema.lower().replace(' ', '_')}.txt"
+    caminho_arquivo = os.path.join(diretorio, nome_arquivo)
+    
+    with open(caminho_arquivo, 'w', encoding='utf-8') as f:
+        f.write(texto)
+    
+    return caminho_arquivo
 
 if __name__ == "__main__":
 
-    tema_do_dia = obter_tema_do_dia()
-    print(f"Tema do dia: {tema_do_dia}")
-
-    prompt = "o seu nome e Greta e voce e professora de alemao.Crie uma lição simples de alemão para iniciantes, focando em saudações e palavras básicas."
-
-
-    for estudante, numero in estudantes.items():
-        print(f"Gerando lição para {estudante}...")
+    try:
+        carregar_configuracoes()
+    except ValueError as ve:
+        print(ve)
+        exit(1)
 
 
-        texto_gerado = gerar_texto_aula(prompt)
-        print(f"Texto gerado para {estudante}: {texto_gerado}")
+    temas = ler_tempos_json()
 
 
-        audio_path = f"licao_{estudante}.mp3"
-        gerar_audio(texto_gerado, audio_path)
-        print(f"Áudio gerado para {estudante} em {audio_path}")
+    tema = buscar_e_atualizar_primeiro_tema(temas)
+    
+    if tema is None:
+        print("Todos os temas já foram executados.")
+    else:
+        print(f"Tema selecionado: {tema}")
+
+        salvar_tempos_json(temas)
 
 
-        salvar_transcricao(estudante, texto_gerado)
+        texto_aula = gerar_texto_aula(tema)
+        if texto_aula:
+            print("Texto gerado pela OpenAI:")
+            print(texto_aula)
+            
+
+            caminho_salvo = salvar_texto_em_diretorio(texto_aula, tema)
+            print(f"Texto salvo em: {caminho_salvo}")
+        else:
+            print("Não foi possível gerar o texto da aula.")
