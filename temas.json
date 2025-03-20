@@ -1,23 +1,23 @@
 [
     {
         "tema": "saudações e despedidas",
-        "executado": false,
-        "data": null
+        "executado": true,
+        "data": "2025-03-20 14:18:03"
     },
     {
         "tema": "números em alemão",
-        "executado": false,
-        "data": null
+        "executado": true,
+        "data": "2025-03-20 14:25:28"
     },
     {
         "tema": "cores",
-        "executado": false,
-        "data": null
+        "executado": true,
+        "data": "2025-03-20 14:34:20"
     },
     {
         "tema": "dias da semana",
-        "executado": false,
-        "data": null
+        "executado": true,
+        "data": "2025-03-20 14:37:42"
     },
     {
         "tema": "meses do ano",

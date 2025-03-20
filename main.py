@@ -1,30 +1,25 @@
-# main.py
 import json
 import os
 from datetime import datetime
 import openai
 from config import carregar_configuracoes
+from flask import Flask, jsonify
+
+app = Flask(__name__)
 
 def ler_tempos_json(caminho='temas.json'):
-    """
-    Lê o arquivo JSON contendo os temas.
-    """
+    """Lê o arquivo JSON contendo os temas."""
     with open(caminho, 'r', encoding='utf-8') as file:
         temas = json.load(file)
     return temas
 
 def salvar_tempos_json(temas, caminho='temas.json'):
-    """
-    Salva a lista de temas atualizada no arquivo JSON.
-    """
+    """Salva a lista de temas atualizada no arquivo JSON."""
     with open(caminho, 'w', encoding='utf-8') as file:
         json.dump(temas, file, ensure_ascii=False, indent=4)
 
 def buscar_e_atualizar_primeiro_tema(temas):
-    """
-    Busca o primeiro tema que ainda não foi executado, atualiza seu status e data.
-    Retorna o tema encontrado (ou None, se todos já tiverem sido executados).
-    """
+    """Busca e atualiza o primeiro tema não executado."""
     for item in temas:
         if not item.get("executado", False):
             item["executado"] = True
@@ -32,14 +27,11 @@ def buscar_e_atualizar_primeiro_tema(temas):
             return item["tema"]
     return None
 
-def gerar_texto_aula(tema):
-    """
-    Função para gerar texto de aula utilizando o modelo da OpenAI.
-    Inclui restrições de tamanho e tom amigável para facilitar a geração de áudio.
-    """
+def gerar_texto_aula(client, tema):
+    """Gera o texto de aula utilizando a API da Deepseek."""
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+        response = client.chat.completions.create(
+            model="deepseek-chat",
             messages=[
                 {"role": "system", "content": "Você é uma professora de alemão chamada Greta."},
                 {"role": "user", "content": (
@@ -50,22 +42,16 @@ def gerar_texto_aula(tema):
                 )}
             ]
         )
-        message_text = response.choices[0].message.content
-        return message_text
+        return response.choices[0].message.content
     except Exception as e:
-        print(f"Erro ao se comunicar com a OpenAI: {e}")
+        print(f"Erro na comunicação com a Deepseek: {e}")
         return None
 
 def salvar_texto_em_diretorio(texto, tema, diretorio="teacher_texts"):
-    """
-    Salva o texto gerado em um arquivo dentro do diretório especificado.
-    O nome do arquivo é baseado no tema, com espaços substituídos por underscores.
-    """
-
+    """Salva o texto gerado em um arquivo."""
     if not os.path.exists(diretorio):
         os.makedirs(diretorio)
     
-
     nome_arquivo = f"{tema.lower().replace(' ', '_')}.txt"
     caminho_arquivo = os.path.join(diretorio, nome_arquivo)
     
@@ -74,35 +60,57 @@ def salvar_texto_em_diretorio(texto, tema, diretorio="teacher_texts"):
     
     return caminho_arquivo
 
-if __name__ == "__main__":
+@app.route('/gerar_aula', methods=['GET'])
 
+@app.route('/gerar_aula', methods=['GET'])
+def gerar_aula():
     try:
-        carregar_configuracoes()
+        # Configuração corrigida
+        api_key = carregar_configuracoes()
+        client = openai.OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com/v1"
+        )
     except ValueError as ve:
-        print(ve)
-        exit(1)
-
+        return jsonify({"error": str(ve)}), 400
 
     temas = ler_tempos_json()
-
-
     tema = buscar_e_atualizar_primeiro_tema(temas)
     
-    if tema is None:
-        print("Todos os temas já foram executados.")
-    else:
-        print(f"Tema selecionado: {tema}")
+    if not tema:
+        return jsonify({"message": "Todos os temas já foram executados."})
+    
+    salvar_tempos_json(temas)
+    
+    # CORREÇÃO AQUI: Passar client e tema como argumentos
+    texto_aula = gerar_texto_aula(client, tema)  # <--- Parâmetros adicionados
+    
+    if texto_aula:
+        caminho_salvo = salvar_texto_em_diretorio(texto_aula, tema)
+        return jsonify({
+            "tema": tema,
+            "texto_aula": texto_aula,
+            "caminho_salvo": caminho_salvo
+        })
+    return jsonify({"error": "Falha ao gerar texto da aula"}), 500
 
-        salvar_tempos_json(temas)
-
-
-        texto_aula = gerar_texto_aula(tema)
-        if texto_aula:
-            print("Texto gerado pela OpenAI:")
-            print(texto_aula)
-            
-
-            caminho_salvo = salvar_texto_em_diretorio(texto_aula, tema)
-            print(f"Texto salvo em: {caminho_salvo}")
-        else:
-            print("Não foi possível gerar o texto da aula.")
+def gerar_texto_aula(client, tema):
+    """Gera texto usando Deepseek R1"""
+    try:
+        response = client.chat.completions.create(
+             model="deepseek-chat", 
+            messages=[
+                {"role": "system", "content": "Você é uma professora de alemão chamada Greta."},
+                {"role": "user", "content": (
+                    f"Crie uma lição simples de alemão para iniciantes no tema '{tema}'. "
+                    "Inclua exemplos práticos e palavras básicas. Formato amigável, "
+                    "500-1000 caracteres para facilitar conversão em áudio."
+                )}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Erro Deepseek: {e}")
+        return None
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5001)
