@@ -1,8 +1,8 @@
 [
     {
         "tema": "saudações e despedidas",
-        "executado": true,
-        "data": "2025-03-22 08:45:07"
+        "executado": false,
+        "data": null
     },
     {
         "tema": "números em alemão",
@@ -12,7 +12,7 @@
     {
         "tema": "cores",
         "executado": false,
-        "data": null
+        "data":null
     },
     {
         "tema": "dias da semana",
