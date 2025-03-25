@@ -6,7 +6,7 @@ from data_handler import ler_tempos_json, salvar_tempos_json, buscar_e_atualizar
 from api_client import gerar_texto_aula
 from file_manager import salvar_texto_em_diretorio
 from audio_generator import gerar_audio_com_elevenlabs
-from whatsapp_sender import enviar_audio_whatsapp
+from whatsapp_sender import enviar_audio_whatsapp, enviar_texto_whatsapp
 
 
 import os
@@ -46,6 +46,8 @@ def gerar_aula():
         caminho_salvo = salvar_texto_em_diretorio(texto_aula, tema)
         
         try:
+            resultado_texto = enviar_texto_whatsapp(numero_whatsapp, texto_aula)
+            print("Resultado do envio de texto:", resultado_texto)
             nome_base = os.path.splitext(os.path.basename(caminho_salvo))[0]
             caminho_audio = gerar_audio_com_elevenlabs(texto_aula, nome_base)
             if caminho_audio:
