@@ -1,3 +1,4 @@
+# api_client.py
 import openai
 
 def gerar_texto_aula(client, tema):

@@ -1,3 +1,5 @@
+
+# file_manager.py
 import os
 import re
 
@@ -6,7 +8,6 @@ def salvar_texto_em_diretorio(texto, tema, diretorio="teacher_texts"):
     if not os.path.exists(diretorio):
         os.makedirs(diretorio)
 
-    # Substitui caracteres inválidos por underline
     nome_arquivo = re.sub(r'[^\w\s-]', '', tema.lower())  # remove parênteses, barras, etc.
     nome_arquivo = nome_arquivo.replace(' ', '_') + ".txt"
 
