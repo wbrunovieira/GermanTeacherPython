@@ -7,7 +7,7 @@ from flask import send_from_directory
 from config import carregar_configuracoes
 from data_handler import ler_tempos_json,  salvar_tempos_json, buscar_e_atualizar_primeiro_tema
 from api_client import gerar_texto_aula
-from file_manager import salvar_audio_na_pasta, salvar_texto_em_diretorio
+from file_manager import descriptografar_audio, salvar_audio_na_pasta, salvar_texto_em_diretorio
 from audio_generator import gerar_audio_com_elevenlabs
 from whatsapp_sender import enviar_audio_whatsapp, enviar_texto_whatsapp
 
@@ -71,8 +71,6 @@ def gerar_aula():
             "caminho_audio": caminho_audio
         })
 
-
-
 @app.route('/webhook/messages_upsert', methods=['POST'])
 def whatsapp_webhook():
     print("Payload recebido:", request.json)
@@ -81,28 +79,36 @@ def whatsapp_webhook():
     if not messages and 'data' in payload:
         messages = [payload['data']]
     
-
+    # Lista de números permitidos (apenas os que você deseja processar)
     allowed_numbers = [numero_whatsapp, numero_whatsappGaga]
     
     for msg in messages:
         if msg.get('messageType') != 'audioMessage':
-            continue  
-        
+            continue  # Ignora mensagens que não são de áudio
 
+        # Verifica se o remetente é permitido
         sender_id = msg['key'].get('participant', msg['key'].get('remoteJid'))
         phone_number = sender_id.split('@')[0]
-        
         if phone_number not in allowed_numbers:
             print(f"Ignorando áudio de usuário não permitido: {phone_number}")
-            continue  
-        
-        audio_url = msg['message']['audioMessage']['url']
+            continue
+
+        audio_payload = msg['message']['audioMessage']
+        audio_url = audio_payload.get('url')
+        mediaKey = audio_payload.get('mediaKey')
+        if not mediaKey:
+            print("mediaKey não encontrada. Não é possível descriptografar.")
+            continue
+
         print(f"Áudio recebido de {sender_id}: {audio_url}")
         try:
-            salvar_audio_na_pasta(audio_url, sender_id)
+            # Baixa e salva o áudio encriptado
+            encrypted_file_path = salvar_audio_na_pasta(audio_url, sender_id)
+            # Realiza a descriptografia
+            decrypted_file_path = descriptografar_audio(encrypted_file_path, mediaKey)
+            print(f"Arquivo descriptografado: {decrypted_file_path}")
         except Exception as e:
-            print(f"Erro ao salvar áudio: {e}")
+            print(f"Erro ao processar áudio: {e}")
     return jsonify({"status": "received"}), 200
-
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5001)
