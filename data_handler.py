@@ -1,6 +1,11 @@
 # data_handler.py
 import json
 from datetime import datetime
+import os
+import time
+from urllib.parse import urlparse
+
+import requests
 
 def ler_tempos_json(caminho='temas.json'):
     """Lê o arquivo JSON contendo os temas."""
@@ -20,3 +25,4 @@ def buscar_e_atualizar_primeiro_tema(temas):
             item["data"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return item["tema"]
     return None
+
